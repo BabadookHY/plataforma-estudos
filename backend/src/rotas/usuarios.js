@@ -1,5 +1,6 @@
 const express = require('express')
 const router = express.Router()
+const bcrypt = require('bcrypt')
 const { createClient } = require('@supabase/supabase-js')
 
 const supabase = createClient(
@@ -14,16 +15,44 @@ router.post('/cadastrar', async (req, res) => {
     return res.status(400).json({ erro: 'Nome, email e senha são obrigatórios' })
   }
 
+  const senhaHash = await bcrypt.hash(senha, 10)
+
   const { data, error } = await supabase
     .from('usuarios')
-    .insert([{ nome, email, senha, tipo_usuario, pontos: 0 }])
+    .insert([{ nome, email, senha: senhaHash, tipo_usuario, pontos: 0 }])
     .select()
 
   if (error) {
     return res.status(500).json({ erro: error.message })
   }
 
-  res.status(201).json({ mensagem: 'Usuário cadastrado com sucesso!', usuario: data[0] })
+  res.status(201).json({ mensagem: 'Usuário cadastrado com sucesso!', usuario: { id: data[0].id, nome: data[0].nome, email: data[0].email } })
+})
+
+router.post('/login', async (req, res) => {
+  const { email, senha } = req.body
+
+  if (!email || !senha) {
+    return res.status(400).json({ erro: 'Email e senha são obrigatórios' })
+  }
+
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('*')
+    .eq('email', email)
+    .single()
+
+  if (error || !data) {
+    return res.status(401).json({ erro: 'Email ou senha incorretos' })
+  }
+
+  const senhaCorreta = await bcrypt.compare(senha, data.senha)
+
+  if (!senhaCorreta) {
+    return res.status(401).json({ erro: 'Email ou senha incorretos' })
+  }
+
+  res.json({ mensagem: 'Login realizado com sucesso!', usuario: { id: data.id, nome: data.nome, email: data.email, pontos: data.pontos } })
 })
 
 router.get('/listar', async (req, res) => {
