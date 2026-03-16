@@ -1,6 +1,7 @@
 const express = require('express')
 const router = express.Router()
 const bcrypt = require('bcrypt')
+const jwt = require('jsonwebtoken')
 const { createClient } = require('@supabase/supabase-js')
 
 const supabase = createClient(
@@ -52,7 +53,13 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ erro: 'Email ou senha incorretos' })
   }
 
-  res.json({ mensagem: 'Login realizado com sucesso!', usuario: { id: data.id, nome: data.nome, email: data.email, pontos: data.pontos } })
+  const token = jwt.sign(
+    { id: data.id, nome: data.nome, email: data.email },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  )
+
+  res.json({ mensagem: 'Login realizado com sucesso!', token, usuario: { id: data.id, nome: data.nome, email: data.email, pontos: data.pontos } })
 })
 
 router.get('/listar', async (req, res) => {
