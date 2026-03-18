@@ -4,8 +4,11 @@ const autenticar = (req, res, next) => {
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1]
 
+  console.log('Token recebido:', token)
+  console.log('JWT_SECRET:', process.env.JWT_SECRET)
+
   if (!token) {
-    return res.status(401).json({ erro: 'Token não fornecido' })
+    return res.status(401).json({ erro: 'Token nao fornecido' })
   }
 
   try {
@@ -13,7 +16,8 @@ const autenticar = (req, res, next) => {
     req.usuario = usuario
     next()
   } catch (err) {
-    return res.status(403).json({ erro: 'Token inválido ou expirado' })
+    console.log('Erro no token:', err.message)
+    return res.status(403).json({ erro: 'Token invalido ou expirado' })
   }
 }
 
