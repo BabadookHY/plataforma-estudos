@@ -12,17 +12,32 @@ const supabase = createClient(
 
 router.post('/cadastrar', async (req, res) => {
   const { nome, email, senha, tipo_usuario } = req.body
+
   if (!nome || !email || !senha) {
     return res.status(400).json({ erro: 'Nome, email e senha sao obrigatorios' })
   }
+
+  const { data: usuarioExistente } = await supabase
+    .from('usuarios')
+    .select('id')
+    .eq('email', email)
+    .single()
+
+  if (usuarioExistente) {
+    return res.status(400).json({ erro: 'Este email ja esta cadastrado' })
+  }
+
   const senhaHash = await bcrypt.hash(senha, 10)
+
   const { data, error } = await supabase
     .from('usuarios')
-    .insert([{ nome, email, senha: senhaHash, tipo_usuario, pontos: 0 }])
+    .insert([{ nome, email, senha: senhaHash, tipo_usuario, pontos: 0, streak: 0 }])
     .select()
+
   if (error) {
     return res.status(500).json({ erro: error.message })
   }
+
   res.status(201).json({ mensagem: 'Usuario cadastrado com sucesso!', usuario: { id: data[0].id, nome: data[0].nome, email: data[0].email } })
 })
 
