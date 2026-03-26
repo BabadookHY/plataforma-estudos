@@ -1,62 +1,80 @@
-const express = require('express')
-const router = express.Router()
-const autenticar = require('../middlewares/auth')
-const { createClient } = require('@supabase/supabase-js')
+const express = require("express");
+const router = express.Router();
+const autenticar = require("../middlewares/auth");
+const { createClient } = require("@supabase/supabase-js");
+const getToken = require("../helpers/get-token");
+const getUserByToken = require("../helpers/get-user-by-token");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-)
+  process.env.SUPABASE_KEY,
+);
 
-router.post('/adicionar', autenticar, async (req, res) => {
-  const { conteudo_id, texto } = req.body
+router.post("/adicionar", autenticar, async (req, res) => {
+  const { conteudo_id, texto } = req.body;
 
   if (!conteudo_id || !texto) {
-    return res.status(400).json({ erro: 'conteudo_id e texto sao obrigatorios' })
+    return res
+      .status(400)
+      .json({ erro: "conteudo_id e texto sao obrigatorios" });
   }
 
   const { data, error } = await supabase
-    .from('comentarios')
+    .from("comentarios")
     .insert([{ usuario_id: req.usuario.id, conteudo_id, texto }])
-    .select()
+    .select();
 
   if (error) {
-    return res.status(500).json({ erro: error.message })
+    return res.status(500).json({ erro: error.message });
   }
 
-  res.status(201).json({ mensagem: 'Comentario adicionado!', comentario: data[0] })
-})
+  res
+    .status(201)
+    .json({ mensagem: "Comentario adicionado!", comentario: data[0] });
+});
 
-router.get('/listar/:conteudo_id', async (req, res) => {
-  const { conteudo_id } = req.params
+router.get("/listar/:conteudo_id", async (req, res) => {
+  const { conteudo_id } = req.params;
 
   const { data, error } = await supabase
-    .from('comentarios')
-    .select('*, usuarios(id, nome)')
-    .eq('conteudo_id', conteudo_id)
-    .order('criado_em', { ascending: false })
+    .from("comentarios")
+    .select("*, usuarios(id, nome)")
+    .eq("conteudo_id", conteudo_id)
+    .order("criado_em", { ascending: false });
 
   if (error) {
-    return res.status(500).json({ erro: error.message })
+    return res.status(500).json({ erro: error.message });
   }
 
-  res.json(data)
-})
+  res.json(data);
+});
 
-router.delete('/remover/:id', autenticar, async (req, res) => {
-  const { id } = req.params
+router.delete("/remover/:id", autenticar, async (req, res) => {
+  const { id } = req.params;
 
+  const token = getToken(req);
+  const user = await getUserByToken(token);
+
+  const { data } = await supabase
+    .from("comentarios")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (user.data.id !== data.usuario_id) {
+    return res
+      .status(401)
+      .json({ erro: "Você não tem permissão para executar essa operação" });
+  }
   const { error } = await supabase
-    .from('comentarios')
+    .from("comentarios")
     .delete()
-    .eq('id', id)
-    .eq('usuario_id', req.usuario.id)
+    .eq("id", id)
+    .eq("usuario_id", req.usuario.id);
 
-  if (error) {
-    return res.status(500).json({ erro: error.message })
-  }
+  if (error) return res.status(500).json({ erro: error.message });
 
-  res.json({ mensagem: 'Comentario removido!' })
-})
+  res.json({ mensagem: "Comentario removido!" });
+});
 
-module.exports = router
+module.exports = router;
