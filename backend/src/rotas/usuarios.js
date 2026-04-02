@@ -1,91 +1,119 @@
-const express = require('express')
-const router = express.Router()
-const bcrypt = require('bcrypt')
-const jwt = require('jsonwebtoken')
-const autenticar = require('../middlewares/auth')
-const { createClient } = require('@supabase/supabase-js')
+const express = require("express");
+const router = express.Router();
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const autenticar = require("../middlewares/auth");
+const { createClient } = require("@supabase/supabase-js");
+const validatePassword = require("../helpers/validate-password");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-)
+  process.env.SUPABASE_KEY,
+);
 
-router.post('/cadastrar', async (req, res) => {
-  const { nome, email, senha, tipo_usuario } = req.body
+router.post("/cadastrar", async (req, res) => {
+  const { nome, email, senha, tipo_usuario } = req.body;
+
+  const isValidPassword = validatePassword(senha);
+  if (!isValidPassword) {
+    return res
+      .status(422)
+      .json({
+        erro: "A senha informada não é segura, tente uma nova.",
+        message: isValidPassword.message,
+        code: "PASSWORD_TO_WEAK",
+      });
+  }
 
   if (!nome || !email || !senha) {
-    return res.status(400).json({ erro: 'Nome, email e senha sao obrigatorios' })
+    return res
+      .status(400)
+      .json({ erro: "Nome, email e senha são obrigatórios" });
   }
 
   const { data: usuarioExistente } = await supabase
-    .from('usuarios')
-    .select('id')
-    .eq('email', email)
-    .single()
+    .from("usuarios")
+    .select("id")
+    .eq("email", email)
+    .single();
 
   if (usuarioExistente) {
-    return res.status(400).json({ erro: 'Este email ja esta cadastrado' })
+    return res.status(400).json({ erro: "Este email ja esta cadastrado" });
   }
 
-  const senhaHash = await bcrypt.hash(senha, 10)
+  const senhaHash = await bcrypt.hash(senha, 10);
 
   const { data, error } = await supabase
-    .from('usuarios')
-    .insert([{ nome, email, senha: senhaHash, tipo_usuario, pontos: 0, streak: 0 }])
-    .select()
+    .from("usuarios")
+    .insert([
+      { nome, email, senha: senhaHash, tipo_usuario, pontos: 0, streak: 0 },
+    ])
+    .select();
 
   if (error) {
-    return res.status(500).json({ erro: error.message })
+    return res.status(500).json({ erro: error.message });
   }
 
-  res.status(201).json({ mensagem: 'Usuario cadastrado com sucesso!', usuario: { id: data[0].id, nome: data[0].nome, email: data[0].email } })
-})
+  res.status(201).json({
+    mensagem: "Usuario cadastrado com sucesso!",
+    usuario: { id: data[0].id, nome: data[0].nome, email: data[0].email },
+  });
+});
 
-router.post('/login', async (req, res) => {
-  const { email, senha } = req.body
+router.post("/login", async (req, res) => {
+  const { email, senha } = req.body;
   if (!email || !senha) {
-    return res.status(400).json({ erro: 'Email e senha sao obrigatorios' })
+    return res.status(400).json({ erro: "Email e senha sao obrigatorios" });
   }
   const { data, error } = await supabase
-    .from('usuarios')
-    .select('*')
-    .eq('email', email)
-    .single()
+    .from("usuarios")
+    .select("*")
+    .eq("email", email)
+    .single();
   if (error || !data) {
-    return res.status(401).json({ erro: 'Email ou senha incorretos' })
+    return res.status(401).json({ erro: "Email ou senha incorretos" });
   }
-  const senhaCorreta = await bcrypt.compare(senha, data.senha)
+  const senhaCorreta = await bcrypt.compare(senha, data.senha);
   if (!senhaCorreta) {
-    return res.status(401).json({ erro: 'Email ou senha incorretos' })
+    return res.status(401).json({ erro: "Email ou senha incorretos" });
   }
   const token = jwt.sign(
     { id: data.id, nome: data.nome, email: data.email },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
-  )
-  res.json({ mensagem: 'Login realizado com sucesso!', token, usuario: { id: data.id, nome: data.nome, email: data.email, pontos: data.pontos } })
-})
+    { expiresIn: "7d" },
+  );
+  res.json({
+    mensagem: "Login realizado com sucesso!",
+    token,
+    usuario: {
+      id: data.id,
+      nome: data.nome,
+      email: data.email,
+      pontos: data.pontos,
+    },
+  });
+});
 
-router.get('/listar', async (req, res) => {
+router.get("/listar", async (req, res) => {
   const { data, error } = await supabase
-    .from('usuarios')
-    .select('id, nome, email, tipo_usuario, pontos, criado_em')
+    .from("usuarios")
+    .select("id, nome, email, tipo_usuario, pontos, criado_em");
   if (error) {
-    return res.status(500).json({ erro: error.message })
+    return res.status(500).json({ erro: error.message });
   }
-  res.json(data)
-})
+  res.json(data);
+});
 
-router.get('/perfil', autenticar, async (req, res) => {
+router.get("/perfil", autenticar, async (req, res) => {
   const { data, error } = await supabase
-    .from('usuarios')
-    .select('id, nome, email, tipo_usuario, pontos, criado_em')
-    .eq('id', req.usuario.id)
-    .single()
+    .from("usuarios")
+    .select("id, nome, email, tipo_usuario, pontos, criado_em")
+    .eq("id", req.usuario.id)
+    .single();
   if (error) {
-    return res.status(500).json({ erro: error.message })
+    return res.status(500).json({ erro: error.message });
   }
-  res.json(data)
-})
+  res.json(data);
+});
 
-module.exports = router
+module.exports = router;
