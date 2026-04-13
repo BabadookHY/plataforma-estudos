@@ -4,13 +4,14 @@ const autenticar = require("../middlewares/auth");
 const { createClient } = require("@supabase/supabase-js");
 const getToken = require("../helpers/get-token");
 const getUserByToken = require("../helpers/get-user-by-token");
+const { validateComments } = require("../middlewares/validators");
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_KEY,
 );
 
-router.post("/adicionar", autenticar, async (req, res) => {
+router.post("/adicionar", autenticar, validateComments, async (req, res) => {
   const { conteudo_id, texto } = req.body;
 
   if (!conteudo_id || !texto) {
